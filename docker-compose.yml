@@ -1,0 +1,58 @@
+version: "3.1"
+
+networks:
+  proxy:
+    name: proxy
+    external: false
+
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: ${PROJECT_NAME}-nginx
+    working_dir: /app
+    volumes:
+      - ./app:/app
+      - ./configs/nginx:/etc/nginx/conf.d
+    depends_on:
+      - php-fpm
+    ports:
+      - "11880:80"
+    networks:
+      - proxy
+      - default
+
+  database:
+    image: "postgres:latest"
+    container_name: ${PROJECT_NAME}-postgres
+    volumes:
+      - ./db-data/:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    ports:
+      - "5432:5432"
+    networks:
+      - proxy
+      - default
+
+  php-fpm: &backend
+    build:
+      context: ./configs/php-fpm
+    container_name: ${PROJECT_NAME}-php-fpm
+    volumes:
+      - ./application:/application
+      - ./configs/php-fpm/php.ini:/usr/local/etc/php/conf.d/zz-custom.ini
+    depends_on:
+      - database
+    networks:
+      - proxy
+      - default
+
+  # horizon:
+  #   <<: *backend
+  #   hostname: horizon
+  #   container_name: ${PROJECT_NAME}-horizon
+  #   command: sh -c "crond -b -d 0 && php artisan horizon"
+  #   depends_on:
+  #     - database
